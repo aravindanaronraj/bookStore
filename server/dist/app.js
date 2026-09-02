@@ -19,17 +19,20 @@ const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
 const contentRoutes_1 = __importDefault(require("./routes/contentRoutes"));
 const app = (0, express_1.default)();
 // Middlewares
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://book-store-ukx2llw1u-aravindan1.vercel.app",
+];
 app.use((0, cors_1.default)({
-    origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+    origin: (origin, callback) => {
+        if (!origin ||
+            allowedOrigins.includes(origin) ||
+            origin.endsWith(".vercel.app")) {
             callback(null, true);
-            return;
         }
-        callback(new Error("Origin is not allowed by CORS"));
+        else {
+            callback(new Error("Origin is not allowed by CORS"));
+        }
     },
     credentials: true,
 }));
