@@ -20,7 +20,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://book-store-five-zeta.vercel.app",
+  "https://book-store-ukx2llw1u-aravindan1.vercel.app",
 ];
 
 app.use(
