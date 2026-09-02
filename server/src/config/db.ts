@@ -1,19 +1,29 @@
 import mongoose from "mongoose";
+import { MongoMemoryServer } from "mongodb-memory-server";
 
 const connectDB = async (): Promise<void> => {
-  try {
-    const mongoURI = process.env.MONGO_URI;
+  let mongoURI = process.env.MONGO_URI;
 
+  try {
     if (!mongoURI) {
-      throw new Error("MONGO_URI is not defined in .env");
+      console.log("MONGO_URI not set. Starting in-memory MongoDB for development...");
+      const memoryServer = await MongoMemoryServer.create();
+      mongoURI = memoryServer.getUri();
     }
 
     await mongoose.connect(mongoURI);
-
     console.log("✅ MongoDB Connected");
   } catch (error) {
     console.error("❌ MongoDB Connection Failed:", error);
-    process.exit(1);
+
+    try {
+      const memoryServer = await MongoMemoryServer.create();
+      await mongoose.connect(memoryServer.getUri());
+      console.log("✅ MongoDB Connected via in-memory fallback");
+    } catch (fallbackError) {
+      console.error("❌ MongoDB Fallback Failed:", fallbackError);
+      process.exit(1);
+    }
   }
 };
 

@@ -12,7 +12,7 @@ export interface IBook extends Document {
 
   category: mongoose.Types.ObjectId;
 
-  images: string[];
+  images: { url: string; publicId: string }[];
 
   bookType: "physical" | "ebook" | "both";
 
@@ -26,6 +26,7 @@ export interface IBook extends Document {
 
   isActive: boolean;
   isFeatured: boolean;
+  isNewLaunch: boolean;
 
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +63,7 @@ const bookSchema = new Schema<IBook>(
     isbn: {
       type: String,
       trim: true,
+      uppercase: true,
       unique: true,
       sparse: true,
     },
@@ -70,6 +72,7 @@ const bookSchema = new Schema<IBook>(
       type: String,
       required: true,
       trim: true,
+      maxlength: 5000,
     },
 
     category: {
@@ -78,11 +81,18 @@ const bookSchema = new Schema<IBook>(
       required: true,
     },
 
-    images: {
-      type: [String],
-      default: [],
+    images: [
+  {
+    url: {
+      type: String,
+      required: true,
     },
-
+    publicId: {
+      type: String,
+      required: true,
+    },
+  },
+],
     bookType: {
       type: String,
       enum: ["physical", "ebook", "both"],
@@ -126,6 +136,7 @@ const bookSchema = new Schema<IBook>(
       type: Boolean,
       default: false,
     },
+    isNewLaunch: { type: Boolean, default: false },
   },
   {
     timestamps: true,

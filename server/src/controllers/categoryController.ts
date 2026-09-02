@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import Category from "../models/Category";
+import Book from "../models/Book";
+import mongoose from "mongoose";
+import cloudinary from "../config/cloudinary";
 
 // Create category
 export const createCategory = async (
@@ -8,6 +11,7 @@ export const createCategory = async (
 ): Promise<void> => {
   try {
     const { name, slug, description, image } = req.body;
+    const file = req.file as Express.Multer.File | undefined;
 
     if (!name || !slug) {
       res.status(400).json({
@@ -26,6 +30,7 @@ export const createCategory = async (
 
     if (existingCategory) {
       res.status(409).json({
+       
         success: false,
         message: "Category already exists",
       });
@@ -36,7 +41,8 @@ export const createCategory = async (
       name: name.trim(),
       slug: slug.toLowerCase().trim(),
       description,
-      image,
+      image: file?.path || image,
+      imagePublicId: file?.filename,
     });
 
     res.status(201).json({
@@ -123,7 +129,8 @@ export const updateCategory = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, slug, description, image, isActive } = req.body;
+    const { name, slug, description, image, isActive, removeImage } = req.body;
+    const file = req.file as Express.Multer.File | undefined;
 
     const category = await Category.findById(id);
 
@@ -149,6 +156,12 @@ export const updateCategory = async (
 
     if (image !== undefined) {
       category.image = image;
+    }
+
+    if (removeImage === "true" || removeImage === true || file) {
+      if (category.imagePublicId) await cloudinary.uploader.destroy(category.imagePublicId).catch(() => undefined);
+      category.image = file?.path;
+      category.imagePublicId = file?.filename;
     }
 
     if (isActive !== undefined) {
@@ -207,4 +220,20 @@ export const deleteCategory = async (
       message: "Internal server error",
     });
   }
+};
+
+export const getAdminCategories = async (_req: Request, res: Response): Promise<void> => {
+  try { res.json({ success: true, categories: await Category.find().sort({ name: 1 }) }); }
+  catch { res.status(500).json({ success: false, message: "Unable to load categories" }); }
+};
+
+export const deleteCategoryPermanently = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) { res.status(400).json({ success: false, message: "Invalid category ID" }); return; }
+    if (await Book.exists({ category: id })) { res.status(409).json({ success: false, message: "இந்த வகையில் நூல்கள் உள்ளன. முதலில் அவற்றை வேறு வகைக்கு மாற்றவும்" }); return; }
+    const category = await Category.findByIdAndDelete(id); if (!category) { res.status(404).json({ success: false, message: "Category not found" }); return; }
+    if (category.imagePublicId) await cloudinary.uploader.destroy(category.imagePublicId).catch(() => undefined);
+    res.json({ success: true, message: "Category permanently deleted" });
+  } catch { res.status(500).json({ success: false, message: "Unable to delete category" }); }
 };

@@ -1,0 +1,12 @@
+﻿import { useEffect, useState } from "react";
+import { Box, Container, Grid, Paper, Stack, Typography } from "@mui/material";
+import AutoStoriesOutlinedIcon from "@mui/icons-material/AutoStoriesOutlined";
+import { getSiteContent, type SiteContent } from "../../services/adminService";
+
+const defaults: SiteContent["about"] = { eyebrow: "எங்கள் கதை", heading: "தமிழ் வாசிப்பின் மகிழ்ச்சியை ஒவ்வொரு இல்லத்திற்கும் கொண்டு செல்கிறோம்.", title: "தூறல் பதிப்பகம்", description: "தமிழ் Languageயின் செழுமையையும் சிறந்த படைப்புகளையும் வாசகர்களிடம் கொண்டு சேர்க்கும் நோக்கில் உருவான பதிப்பகம்." };
+const About = () => {
+  const [about, setAbout] = useState(defaults);
+  useEffect(() => { void getSiteContent().then((content) => setAbout(content.about)).catch(() => undefined); }, []);
+  return <Box><Box sx={{ bgcolor: "primary.dark", color: "white", py: { xs: 7, md: 12 } }}><Container maxWidth="lg"><Typography variant="overline" color="secondary.light" sx={{ fontWeight: 800 }}>{about.eyebrow}</Typography><Typography variant="h1" sx={{ fontWeight: 900, mt: 2, maxWidth: 850 }}>{about.heading}</Typography></Container></Box><Container maxWidth="lg" sx={{ py: { xs: 6, md: 10 } }}><Grid container spacing={5} sx={{ alignItems: "center" }}><Grid size={{ xs: 12, md: 7 }}><Typography variant="h3" sx={{ fontWeight: 900 }}>{about.title}</Typography><Typography color="text.secondary" sx={{ mt: 2, lineHeight: 2, whiteSpace: "pre-wrap" }}>{about.description}</Typography></Grid><Grid size={{ xs: 12, md: 5 }}><Paper elevation={0} sx={{ p: 5, textAlign: "center", bgcolor: "#EFE9DD", borderRadius: 5 }}><AutoStoriesOutlinedIcon sx={{ fontSize: 72, color: "primary.main" }} /><Typography variant="h4" sx={{ fontWeight: 900, mt: 2 }}>நல்ல நூல்.<br />நிறைவான வாசிப்பு.</Typography></Paper></Grid></Grid><Stack direction={{ xs: "column", md: "row" }} spacing={3} sx={{ mt: 8 }}>{[["தரம்", "கவனமாகத் தேர்ந்தெடுக்கப்பட்ட, நேர்த்தியாக உருவாக்கப்பட்ட நூல்கள்."], ["தமிழ்", "தமிழின் குரல்களையும் புதிய எழுத்தாளர்களையும் வளர்த்தல்."], ["வாசகர்", "நம்பகமான சேவை மற்றும் மகிழ்ச்சியான வாசிப்பு அனுபவம்."]].map(([title, text]) => <Paper key={title} elevation={0} sx={{ p: 3, flex: 1, border: "1px solid rgba(30,64,175,.1)", borderRadius: 3 }}><Typography variant="h5" sx={{ fontWeight: 900 }}>{title}</Typography><Typography color="text.secondary" sx={{ mt: 1 }}>{text}</Typography></Paper>)}</Stack></Container></Box>;
+};
+export default About;

@@ -24,3 +24,28 @@ export const admin = (
 
   next();
 };
+
+export const adminOrApprovedStaff = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: "Not authenticated" });
+    return;
+  }
+  if (req.user.role === "admin" || (req.user.role === "staff" && req.user.staffApproval === "approved")) {
+    next();
+    return;
+  }
+  res.status(403).json({ success: false, message: "Approved staff access required" });
+};
+
+export const requirePermission = (permission: "dashboard" | "products" | "orders" | "customers") =>
+  (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (req.user?.role === "admin" || req.user?.permissions.includes(permission)) {
+      next();
+      return;
+    }
+    res.status(403).json({ success: false, message: `${permission} permission required` });
+  };

@@ -1,0 +1,4 @@
+﻿import { Box, Container, Paper, Typography } from "@mui/material";
+import { Outlet, useNavigate } from "react-router-dom";
+const AuthLayout = () => { const navigate = useNavigate(); return <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", bgcolor: "background.default", pt: { xs: 4, md: 6 }, pb: 5 }}><Container maxWidth="sm"><Box onClick={() => navigate("/")} sx={{ textAlign: "center", mb: 3, cursor: "pointer" }}><Box component="img" src="/thooral-logo.jpeg" alt="தூறல் பதிப்பகம்" sx={{ width: { xs: 150, sm: 180 }, height: "auto", display: "block", mx: "auto" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>தமிழ் நூல்களின் அன்பான உலகம்</Typography></Box><Paper elevation={0} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 3, border: "1px solid", borderColor: "divider" }}><Outlet /></Paper></Container></Box>; };
+export default AuthLayout;

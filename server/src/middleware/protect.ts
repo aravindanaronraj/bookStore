@@ -18,7 +18,9 @@ export interface AuthRequest extends Request {
     name: string;
     email: string;
     phone: string;
-    role: "user" | "admin";
+    role: "user" | "staff" | "admin";
+    staffApproval: "pending" | "approved" | "rejected";
+    permissions: ("dashboard" | "products" | "orders" | "customers")[];
     subscription: {
       plan: "free" | "premium";
       startDate?: Date;
@@ -63,6 +65,8 @@ export const protect = async (
       email: user.email,
       phone: user.phone,
       role: user.role,
+      staffApproval: user.staffApproval,
+      permissions: user.permissions,
       subscription: user.subscription,
     };
 

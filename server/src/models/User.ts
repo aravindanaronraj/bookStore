@@ -16,7 +16,9 @@ export interface IUser extends Document {
   password: string;
   phone: string;
 
-  role: "user" | "admin";
+  role: "user" | "staff" | "admin";
+  staffApproval: "pending" | "approved" | "rejected";
+  permissions: ("dashboard" | "products" | "orders" | "customers")[];
 
 
 
@@ -39,6 +41,9 @@ emailVerificationOtpExpires?: Date;
 emailVerificationOtpAttempts: number;
 
 emailVerificationLastSentAt?: Date;
+passwordResetOtpHash?: string;
+passwordResetOtpExpires?: Date;
+passwordResetOtpAttempts: number;
 
   createdAt: Date;
   updatedAt: Date;
@@ -124,8 +129,20 @@ const userSchema = new Schema<IUser>(
 
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "staff", "admin"],
       default: "user",
+    },
+
+    staffApproval: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+
+    permissions: {
+      type: [String],
+      enum: ["dashboard", "products", "orders", "customers"],
+      default: [],
     },
 
     isEmailVerified: {
@@ -178,6 +195,9 @@ emailVerificationOtpAttempts: {
 emailVerificationLastSentAt: {
   type: Date,
 },
+passwordResetOtpHash: { type: String },
+passwordResetOtpExpires: { type: Date },
+passwordResetOtpAttempts: { type: Number, default: 0 },
   },
   {
     timestamps: true,

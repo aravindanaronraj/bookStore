@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/User";
 
-import { sendVerificationEmail } from "../services/emailService";
+import { sendAdminRegistrationEmail, sendPasswordResetOtp, sendPasswordResetSuccess, sendVerificationEmail } from "../services/emailService";
 import { isValidEmail, isValidPhone, validatePassword } from "../utils/validators";
 import generateToken from "../utils/generateToken";
 import { AuthRequest } from "../middleware/protect";
@@ -125,6 +125,11 @@ try {
   console.error("Send Verification Email Error:", emailError);
   // swallow — account exists regardless, don't 500 the registration
 }
+    try {
+      await sendAdminRegistrationEmail({ name: user.name, email: user.email, phone: user.phone });
+    } catch (emailError) {
+      console.error("Send Admin Registration Email Error:", emailError);
+    }
     res.status(201).json({
       success: true,
       message:
@@ -486,6 +491,8 @@ export const loginUser = async (
         email: user.email,
         phone: user.phone,
         role: user.role,
+        staffApproval: user.staffApproval,
+        permissions: user.permissions,
         subscription: user.subscription,
       },
     });
@@ -551,4 +558,64 @@ export const logoutUser = async (
       message: "Internal server error",
     });
   }
+};
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const email = String(req.body.email || "").toLowerCase().trim();
+    if (!isValidEmail(email)) { res.status(400).json({ success: false, message: "சரியான மின்னஞ்சலை உள்ளிடவும்" }); return; }
+    const user = await User.findOne({ email });
+    if (user) {
+      const otp = generateVerificationOtp();
+      user.passwordResetOtpHash = hashVerificationValue(otp);
+      user.passwordResetOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      user.passwordResetOtpAttempts = 0;
+      await user.save();
+      await sendPasswordResetOtp(user.email, user.name, otp);
+    }
+    res.json({ success: true, message: "கணக்கு இருந்தால் மீட்டமைப்புக் குறியீடு மின்னஞ்சலுக்கு அனுப்பப்பட்டுள்ளது" });
+  } catch (error) { console.error("Forgot password error:", error); res.status(500).json({ success: false, message: "மீட்டமைப்புக் குறியீட்டை அனுப்ப முடியவில்லை" }); }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const email = String(req.body.email || "").toLowerCase().trim(); const otp = String(req.body.otp || ""); const password = String(req.body.password || "");
+    const passwordCheck = validatePassword(password);
+    if (!email || !/^\d{6}$/.test(otp) || !passwordCheck.valid) { res.status(400).json({ success: false, message: passwordCheck.message || "மின்னஞ்சல் மற்றும் 6 இலக்கக் குறியீடு தேவை" }); return; }
+    const user = await User.findOne({ email });
+    if (!user || !user.passwordResetOtpHash || !user.passwordResetOtpExpires || user.passwordResetOtpExpires < new Date()) { res.status(400).json({ success: false, message: "குறியீடு தவறானது அல்லது காலாவதியானது" }); return; }
+    if (user.passwordResetOtpAttempts >= 5) { res.status(429).json({ success: false, message: "அதிக முயற்சிகள். புதிய குறியீட்டைக் கோரவும்" }); return; }
+    if (hashVerificationValue(otp) !== user.passwordResetOtpHash) { user.passwordResetOtpAttempts += 1; await user.save(); res.status(400).json({ success: false, message: "தவறான குறியீடு" }); return; }
+    user.password = await bcrypt.hash(password, 10); user.passwordResetOtpHash = undefined; user.passwordResetOtpExpires = undefined; user.passwordResetOtpAttempts = 0; await user.save();
+    void sendPasswordResetSuccess(user.email, user.name).catch((emailError) => console.error("Password reset confirmation email failed:", emailError));
+    res.json({ success: true, message: "கடவுச்சொல் வெற்றிகரமாக மீட்டமைக்கப்பட்டது" });
+  } catch (error) { console.error("Reset password error:", error); res.status(500).json({ success: false, message: "கடவுச்சொல்லை மீட்டமைக்க முடியவில்லை" }); }
+};
+
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const currentPassword = String(req.body.currentPassword || ""); const newPassword = String(req.body.newPassword || "");
+    const check = validatePassword(newPassword); if (!check.valid) { res.status(400).json({ success: false, message: check.message }); return; }
+    const user = await User.findById(req.user?.id); if (!user || !(await bcrypt.compare(currentPassword, user.password))) { res.status(400).json({ success: false, message: "தற்போதைய கடவுச்சொல் தவறானது" }); return; }
+    if (await bcrypt.compare(newPassword, user.password)) { res.status(400).json({ success: false, message: "புதிய கடவுச்சொல் பழைய கடவுச்சொல்லிலிருந்து வேறுபட வேண்டும்" }); return; }
+    user.password = await bcrypt.hash(newPassword, 10); await user.save(); res.json({ success: true, message: "கடவுச்சொல் மாற்றப்பட்டது" });
+  } catch (error) { console.error("Change password error:", error); res.status(500).json({ success: false, message: "கடவுச்சொல்லை மாற்ற முடியவில்லை" }); }
+};
+
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await User.findById(req.user?.id); if (!user) { res.status(404).json({ success: false, message: "பயனர் கிடைக்கவில்லை" }); return; }
+    const name = String(req.body.name || "").trim(); const phone = String(req.body.phone || "").trim(); const email = String(req.body.email || "").toLowerCase().trim();
+    if (name.length < 2 || name.length > 50 || !isValidPhone(phone) || !isValidEmail(email)) { res.status(400).json({ success: false, message: "சரியான பெயர், மின்னஞ்சல் மற்றும் 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்" }); return; }
+    let verificationRequired = false;
+    if (email !== user.email) {
+      if (!req.body.currentPassword || !(await bcrypt.compare(String(req.body.currentPassword), user.password))) { res.status(400).json({ success: false, message: "மின்னஞ்சலை மாற்ற தற்போதைய கடவுச்சொல் தேவை" }); return; }
+      if (await User.exists({ email, _id: { $ne: user._id } })) { res.status(409).json({ success: false, message: "இந்த மின்னஞ்சல் ஏற்கனவே பயன்படுத்தப்படுகிறது" }); return; }
+      const token = generateVerificationToken(); const otp = generateVerificationOtp();
+      user.email = email; user.isEmailVerified = false; user.emailVerificationTokenHash = hashVerificationValue(token); user.emailVerificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); user.emailVerificationOtpHash = hashVerificationValue(otp); user.emailVerificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000); user.emailVerificationOtpAttempts = 0; user.emailVerificationLastSentAt = new Date();
+      await sendVerificationEmail(email, name, token, otp); verificationRequired = true;
+    }
+    user.name = name; user.phone = phone; await user.save();
+    res.json({ success: true, message: verificationRequired ? "சுயவிவரம் புதுப்பிக்கப்பட்டது. புதிய மின்னஞ்சலை OTP மூலம் உறுதிசெய்யவும்" : "சுயவிவரம் புதுப்பிக்கப்பட்டது", verificationRequired, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, staffApproval: user.staffApproval, permissions: user.permissions, subscription: user.subscription } });
+  } catch (error) { console.error("Update profile error:", error); res.status(500).json({ success: false, message: "சுயவிவரத்தைப் புதுப்பிக்க முடியவில்லை" }); }
 };

@@ -1,0 +1,11 @@
+﻿import { useState, type FormEvent } from "react";
+import { Alert, Button, Container, Paper, Stack, TextField, Typography } from "@mui/material";
+import { changePassword } from "../../services/authService";
+import { getErrorMessage } from "../../utils/getErrorMessage";
+
+const ChangePassword = () => {
+  const [current, setCurrent] = useState(""); const [next, setNext] = useState(""); const [confirm, setConfirm] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [message, setMessage] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (next !== confirm) { setError("புதிய கடவுச்சொற்கள் பொருந்தவில்லை"); return; } try { setLoading(true); setError(""); await changePassword(current, next); setCurrent(""); setNext(""); setConfirm(""); setMessage("கடவுச்சொல் வெற்றிகரமாக மாற்றப்பட்டது"); } catch (e: unknown) { setError(getErrorMessage(e, "கடவுச்சொல்லை மாற்ற முடியவில்லை")); } finally { setLoading(false); } };
+  return <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}><Paper component="form" onSubmit={submit} elevation={0} sx={{ p: { xs: 3, sm: 5 }, border: "1px solid rgba(30,64,175,.12)", borderRadius: 4 }}><Typography variant="h4" sx={{ fontWeight: 900 }}>கடவுச்சொல் மாற்றம்</Typography><Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>உங்கள் கணக்கைப் பாதுகாக்க வலுவான புதிய கடவுச்சொல்லைப் பயன்படுத்துங்கள்.</Typography>{error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}<Stack spacing={2}><TextField required type="password" label="தற்போதைய கடவுச்சொல்" value={current} onChange={(e) => setCurrent(e.target.value)} /><TextField required type="password" label="புதிய கடவுச்சொல்" value={next} helperText="8+ எழுத்துகள்; பெரிய, சிறிய எழுத்து, எண் மற்றும் சிறப்பு குறியீடு தேவை" onChange={(e) => setNext(e.target.value)} /><TextField required type="password" label="புதிய கடவுச்சொல்லை மீண்டும் உள்ளிடுக" value={confirm} onChange={(e) => setConfirm(e.target.value)} /><Button type="submit" variant="contained" size="large" disabled={loading}>{loading ? "மாற்றப்படுகிறது…" : "கடவுச்சொல்லை மாற்றுக"}</Button></Stack></Paper></Container>;
+};
+export default ChangePassword;
