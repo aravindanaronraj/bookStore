@@ -10,6 +10,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+export const verifyEmailTransport = async (): Promise<void> => {
+  requireEmailConfig();
+  await transporter.verify();
+};
+
 const getAdminRecipients = (): string[] => (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || "")
   .split(",")
   .map((email) => email.trim())
@@ -25,10 +30,23 @@ const requireEmailConfig = (): void => {
   }
 };
 
-const readEmailTemplate = (fileName: string) => fs.readFile(
-  path.join(process.cwd(), "src", "templates", "emails", fileName),
-  "utf-8"
-);
+const readEmailTemplate = async (fileName: string): Promise<string> => {
+  const candidates = [
+    path.join(__dirname, "..", "templates", "emails", fileName),
+    path.join(process.cwd(), "src", "templates", "emails", fileName),
+    path.join(process.cwd(), "dist", "templates", "emails", fileName),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await fs.readFile(candidate, "utf-8");
+    } catch (error: any) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
+  throw new Error(`Email template not found: ${fileName}`);
+};
 
 const renderTemplate = (template: string, values: Record<string, string>): string =>
   Object.entries(values).reduce(
@@ -54,18 +72,11 @@ export const sendVerificationEmail = async (
   verificationToken: string,
   verificationOtp: string
 ): Promise<void> => {
-  const templatePath = path.join(
-  process.cwd(),
-  "src",
-  "templates",
-  "emails",
-  "verifyEmail.html"
-);
+  requireEmailConfig();
+  let html = await readEmailTemplate("verifyEmail.html");
 
-  let html = await fs.readFile(templatePath, "utf-8");
-
-  const verificationUrl =
-    `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+  const verificationUrl = `${frontendUrl}/verify-email/${encodeURIComponent(verificationToken)}`;
 
   html = html
     .replace(/{{name}}/g, escapeHtml(name))
@@ -96,6 +107,7 @@ export const sendPasswordResetOtp = async (email: string, name: string, otp: str
 };
 
 export const sendPasswordResetSuccess = async (email: string, name: string): Promise<void> => {
+  requireEmailConfig();
   await transporter.sendMail({
     from: `"தூறல் பதிப்பகம்" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -143,10 +155,9 @@ const sendLegacyOrderConfirmationEmails = async (order: OrderEmailData): Promise
 };
 
 export const sendOrderConfirmationEmails = async (order: OrderEmailData): Promise<void> => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn("Order emails skipped: email configuration is incomplete");
-    return;
-  }
+  requireEmailConfig();
+  const adminRecipients = getAdminRecipients();
+  if (!adminRecipients.length) throw new Error("ADMIN_EMAIL or EMAIL_USER is required for order notifications");
   const [customerTemplate, adminTemplate] = await Promise.all([
     readEmailTemplate("orderConfirmation.html"),
     readEmailTemplate("newOrderAdmin.html"),
@@ -159,10 +170,14 @@ export const sendOrderConfirmationEmails = async (order: OrderEmailData): Promis
     shippingFee: money(order.shippingFee), totalAmount: money(order.totalAmount),
     shippingAddress: addressHtml(order),
   };
-  await Promise.all([
+  const results = await Promise.allSettled([
     transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: order.customerEmail, subject: `Order confirmed - #${values.orderNumber}`, html: renderTemplate(customerTemplate, values) }),
-    transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: getAdminRecipients(), replyTo: order.customerEmail, subject: `New order received - #${values.orderNumber}`, html: renderTemplate(adminTemplate, values) }),
+    transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: adminRecipients, replyTo: order.customerEmail, subject: `New order received - #${values.orderNumber}`, html: renderTemplate(adminTemplate, values) }),
   ]);
+  const failures = results
+    .map((result, index) => result.status === "rejected" ? `${index === 0 ? "customer" : "admin"}: ${String(result.reason)}` : null)
+    .filter(Boolean);
+  if (failures.length) throw new Error(`Order email delivery failed (${failures.join("; ")})`);
 };
 
 export const sendAdminRegistrationEmail = async (user: { name: string; email: string; phone: string }): Promise<void> => {

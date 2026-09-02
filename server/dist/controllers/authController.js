@@ -47,9 +47,24 @@ const registerUser = async (req, res) => {
             email: normalizedEmail,
         });
         if (existingUser) {
-            res.status(409).json({
-                success: false,
-                message: "User already exists with this email",
+            if (existingUser.isEmailVerified) {
+                res.status(409).json({ success: false, message: "User already exists with this email" });
+                return;
+            }
+            const retryToken = (0, verification_1.generateVerificationToken)();
+            const retryOtp = (0, verification_1.generateVerificationOtp)();
+            existingUser.emailVerificationTokenHash = (0, verification_1.hashVerificationValue)(retryToken);
+            existingUser.emailVerificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+            existingUser.emailVerificationOtpHash = (0, verification_1.hashVerificationValue)(retryOtp);
+            existingUser.emailVerificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+            existingUser.emailVerificationOtpAttempts = 0;
+            await existingUser.save();
+            await (0, emailService_1.sendVerificationEmail)(existingUser.email, existingUser.name, retryToken, retryOtp);
+            existingUser.emailVerificationLastSentAt = new Date();
+            await existingUser.save();
+            res.status(200).json({
+                success: true,
+                message: "A new verification email has been sent. Please enter the OTP to finish registration.",
             });
             return;
         }
@@ -75,11 +90,13 @@ const registerUser = async (req, res) => {
             emailVerificationOtpHash: otpHash,
             emailVerificationOtpExpires: otpExpires,
             emailVerificationOtpAttempts: 0,
-            emailVerificationLastSentAt: new Date(),
+            emailVerificationLastSentAt: undefined,
         });
         // Send RAW values only through email
         try {
             await (0, emailService_1.sendVerificationEmail)(user.email, user.name, verificationToken, verificationOtp);
+            user.emailVerificationLastSentAt = new Date();
+            await user.save();
         }
         catch (emailError) {
             console.error("Send Verification Email Error:", emailError);
@@ -467,7 +484,12 @@ const resetPassword = async (req, res) => {
         user.passwordResetOtpExpires = undefined;
         user.passwordResetOtpAttempts = 0;
         await user.save();
-        void (0, emailService_1.sendPasswordResetSuccess)(user.email, user.name).catch((emailError) => console.error("Password reset confirmation email failed:", emailError));
+        try {
+            await (0, emailService_1.sendPasswordResetSuccess)(user.email, user.name);
+        }
+        catch (emailError) {
+            console.error("Password reset confirmation email failed:", emailError);
+        }
         res.json({ success: true, message: "கடவுச்சொல் வெற்றிகரமாக மீட்டமைக்கப்பட்டது" });
     }
     catch (error) {

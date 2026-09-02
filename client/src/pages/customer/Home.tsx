@@ -456,7 +456,7 @@ const Home = () => {
   );
 };
 
-const heroDefaults: SiteContent["hero"] = { badge: "தேர்ந்தெடுக்கப்பட்ட தமிழ் நூல்கள்", heading: "மனதில் தூறலாய் தங்கும் கதைகள்.", description: "தமிழ் இலக்கியம், நவீனப் புதினங்கள், சிறார் நூல்கள் மற்றும் வாழ்வியல் சிந்தனைகளின் சிறந்த தொகுப்பைக் கண்டறியுங்கள்.", primaryButton: "நூல்களைப் பாருங்கள்", secondaryButton: "வகைகளை ஆராயுங்கள்", imageUrl: "", imagePublicId: "" };
+const heroDefaults: SiteContent["hero"] = { badge: "", heading: "", description: "", primaryButton: "", secondaryButton: "", imageUrl: "", imagePublicId: "" };
 const DynamicHero = ({ navigate }: { navigate: (path: string) => void }) => {
   const [hero, setHero] = useState(heroDefaults);
   useEffect(() => { void getSiteContent().then((content) => setHero(content.hero)).catch(() => undefined); }, []);

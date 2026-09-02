@@ -67,9 +67,26 @@ if (!passwordCheck.valid) {
     });
 
     if (existingUser) {
-      res.status(409).json({
-        success: false,
-        message: "User already exists with this email",
+      if (existingUser.isEmailVerified) {
+        res.status(409).json({ success: false, message: "User already exists with this email" });
+        return;
+      }
+
+      const retryToken = generateVerificationToken();
+      const retryOtp = generateVerificationOtp();
+      existingUser.emailVerificationTokenHash = hashVerificationValue(retryToken);
+      existingUser.emailVerificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+      existingUser.emailVerificationOtpHash = hashVerificationValue(retryOtp);
+      existingUser.emailVerificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      existingUser.emailVerificationOtpAttempts = 0;
+      await existingUser.save();
+
+      await sendVerificationEmail(existingUser.email, existingUser.name, retryToken, retryOtp);
+      existingUser.emailVerificationLastSentAt = new Date();
+      await existingUser.save();
+      res.status(200).json({
+        success: true,
+        message: "A new verification email has been sent. Please enter the OTP to finish registration.",
       });
       return;
     }
@@ -110,7 +127,7 @@ if (!passwordCheck.valid) {
 
       emailVerificationOtpAttempts: 0,
 
-      emailVerificationLastSentAt: new Date(),
+      emailVerificationLastSentAt: undefined,
     });
 
     // Send RAW values only through email
@@ -121,6 +138,8 @@ try {
     verificationToken,
     verificationOtp
   );
+  user.emailVerificationLastSentAt = new Date();
+  await user.save();
 } catch (emailError) {
   console.error("Send Verification Email Error:", emailError);
   // swallow — account exists regardless, don't 500 the registration
@@ -587,7 +606,8 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     if (user.passwordResetOtpAttempts >= 5) { res.status(429).json({ success: false, message: "அதிக முயற்சிகள். புதிய குறியீட்டைக் கோரவும்" }); return; }
     if (hashVerificationValue(otp) !== user.passwordResetOtpHash) { user.passwordResetOtpAttempts += 1; await user.save(); res.status(400).json({ success: false, message: "தவறான குறியீடு" }); return; }
     user.password = await bcrypt.hash(password, 10); user.passwordResetOtpHash = undefined; user.passwordResetOtpExpires = undefined; user.passwordResetOtpAttempts = 0; await user.save();
-    void sendPasswordResetSuccess(user.email, user.name).catch((emailError) => console.error("Password reset confirmation email failed:", emailError));
+    try { await sendPasswordResetSuccess(user.email, user.name); }
+    catch (emailError) { console.error("Password reset confirmation email failed:", emailError); }
     res.json({ success: true, message: "கடவுச்சொல் வெற்றிகரமாக மீட்டமைக்கப்பட்டது" });
   } catch (error) { console.error("Reset password error:", error); res.status(500).json({ success: false, message: "கடவுச்சொல்லை மீட்டமைக்க முடியவில்லை" }); }
 };

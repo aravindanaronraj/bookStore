@@ -21,6 +21,7 @@ import Categories from "../pages/customer/Categories";
 import About from "../pages/customer/About";
 import Contact from "../pages/customer/Contact";
 import ForgotPassword from "../pages/auth/ForgotPassword";
+import VerifyEmail from "../pages/auth/VerifyEmail";
 import ChangePassword from "../pages/customer/ChangePassword";
 import ProtectedRoute from "./ProtectedRoute";
 import Profile from "../pages/customer/Profile";
@@ -81,6 +82,7 @@ const AppRoutes = () => {
         />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-email/:token" element={<VerifyEmail />} />
       </Route>
     </Routes>
   );

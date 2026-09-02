@@ -52,6 +52,7 @@ export const LogoutUser = async()=>{
 
 export const registerUser = async (data: { name: string; email: string; phone: string; password: string }) => (await api.post("/auth/register", data)).data;
 export const verifyRegistrationOtp = async (email: string, otp: string) => (await api.post("/auth/verify-email-otp", { email, otp })).data;
+export const verifyRegistrationToken = async (token: string) => (await api.get(`/auth/verify-email/${encodeURIComponent(token)}`)).data;
 export const resendVerification = async (email: string) => (await api.post("/auth/resend-verification", { email })).data;
 export const requestPasswordReset = async (email: string) => (await api.post("/auth/forgot-password", { email })).data;
 export const resetPassword = async (email: string, otp: string, password: string) => (await api.post("/auth/reset-password", { email, otp, password })).data;

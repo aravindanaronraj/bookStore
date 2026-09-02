@@ -455,8 +455,10 @@ export const verifyPayment = async (
 
     const verifiedOrder = await Order.findById(order._id);
 
+    let emailWarning: string | undefined;
     if (verifiedOrder) {
-      void sendOrderConfirmationEmails({
+      try {
+        await sendOrderConfirmationEmails({
         id: verifiedOrder._id.toString(),
         customerName: req.user.name,
         customerEmail: req.user.email,
@@ -467,13 +469,18 @@ export const verifyPayment = async (
         shippingFee: verifiedOrder.shippingFee,
         totalAmount: verifiedOrder.totalAmount,
         shippingAddress: verifiedOrder.shippingAddress,
-      }).catch((emailError) => console.error("Order confirmation email failed:", emailError));
+        });
+      } catch (emailError) {
+        console.error("Order confirmation email failed:", emailError);
+        emailWarning = "Payment succeeded, but one or more confirmation emails could not be delivered. Please contact support if you do not receive your receipt.";
+      }
     }
 
     res.status(200).json({
       success: true,
       message: "Payment verified successfully",
       order: verifiedOrder,
+      ...(emailWarning ? { emailWarning } : {}),
     });
   } catch (error) {
     console.error("Verify Payment Error:", error);

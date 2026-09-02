@@ -369,24 +369,32 @@ const verifyPayment = async (req, res) => {
             throw finalizationError;
         }
         const verifiedOrder = await Order_1.default.findById(order._id);
+        let emailWarning;
         if (verifiedOrder) {
-            void (0, emailService_1.sendOrderConfirmationEmails)({
-                id: verifiedOrder._id.toString(),
-                customerName: req.user.name,
-                customerEmail: req.user.email,
-                customerPhone: req.user.phone,
-                items: verifiedOrder.items.map((item) => ({ title: item.title, quantity: item.quantity, price: item.price })),
-                subtotal: verifiedOrder.subtotal,
-                discount: verifiedOrder.discount,
-                shippingFee: verifiedOrder.shippingFee,
-                totalAmount: verifiedOrder.totalAmount,
-                shippingAddress: verifiedOrder.shippingAddress,
-            }).catch((emailError) => console.error("Order confirmation email failed:", emailError));
+            try {
+                await (0, emailService_1.sendOrderConfirmationEmails)({
+                    id: verifiedOrder._id.toString(),
+                    customerName: req.user.name,
+                    customerEmail: req.user.email,
+                    customerPhone: req.user.phone,
+                    items: verifiedOrder.items.map((item) => ({ title: item.title, quantity: item.quantity, price: item.price })),
+                    subtotal: verifiedOrder.subtotal,
+                    discount: verifiedOrder.discount,
+                    shippingFee: verifiedOrder.shippingFee,
+                    totalAmount: verifiedOrder.totalAmount,
+                    shippingAddress: verifiedOrder.shippingAddress,
+                });
+            }
+            catch (emailError) {
+                console.error("Order confirmation email failed:", emailError);
+                emailWarning = "Payment succeeded, but one or more confirmation emails could not be delivered. Please contact support if you do not receive your receipt.";
+            }
         }
         res.status(200).json({
             success: true,
             message: "Payment verified successfully",
             order: verifiedOrder,
+            ...(emailWarning ? { emailWarning } : {}),
         });
     }
     catch (error) {

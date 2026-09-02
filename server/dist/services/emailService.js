@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendAdminRegistrationEmail = exports.sendOrderConfirmationEmails = exports.sendPasswordResetSuccess = exports.sendPasswordResetOtp = exports.sendVerificationEmail = exports.sendContactNotification = void 0;
+exports.sendAdminRegistrationEmail = exports.sendOrderConfirmationEmails = exports.sendPasswordResetSuccess = exports.sendPasswordResetOtp = exports.sendVerificationEmail = exports.sendContactNotification = exports.verifyEmailTransport = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
@@ -14,6 +14,11 @@ const transporter = nodemailer_1.default.createTransport({
         pass: process.env.EMAIL_PASS,
     },
 });
+const verifyEmailTransport = async () => {
+    requireEmailConfig();
+    await transporter.verify();
+};
+exports.verifyEmailTransport = verifyEmailTransport;
 const getAdminRecipients = () => (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || "")
     .split(",")
     .map((email) => email.trim())
@@ -26,7 +31,23 @@ const requireEmailConfig = () => {
         throw new Error("Email configuration is incomplete: EMAIL_USER and EMAIL_PASS are required");
     }
 };
-const readEmailTemplate = (fileName) => promises_1.default.readFile(path_1.default.join(process.cwd(), "src", "templates", "emails", fileName), "utf-8");
+const readEmailTemplate = async (fileName) => {
+    const candidates = [
+        path_1.default.join(__dirname, "..", "templates", "emails", fileName),
+        path_1.default.join(process.cwd(), "src", "templates", "emails", fileName),
+        path_1.default.join(process.cwd(), "dist", "templates", "emails", fileName),
+    ];
+    for (const candidate of candidates) {
+        try {
+            return await promises_1.default.readFile(candidate, "utf-8");
+        }
+        catch (error) {
+            if (error?.code !== "ENOENT")
+                throw error;
+        }
+    }
+    throw new Error(`Email template not found: ${fileName}`);
+};
 const renderTemplate = (template, values) => Object.entries(values).reduce((html, [key, value]) => html.replace(new RegExp(`{{${key}}}`, "g"), value), template);
 const sendContactNotification = async (contact) => {
     const recipients = getAdminRecipients();
@@ -46,9 +67,10 @@ const sendContactNotification = async (contact) => {
 };
 exports.sendContactNotification = sendContactNotification;
 const sendVerificationEmail = async (email, name, verificationToken, verificationOtp) => {
-    const templatePath = path_1.default.join(process.cwd(), "src", "templates", "emails", "verifyEmail.html");
-    let html = await promises_1.default.readFile(templatePath, "utf-8");
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    requireEmailConfig();
+    let html = await readEmailTemplate("verifyEmail.html");
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+    const verificationUrl = `${frontendUrl}/verify-email/${encodeURIComponent(verificationToken)}`;
     html = html
         .replace(/{{name}}/g, escapeHtml(name))
         .replace(/{{verificationUrl}}/g, verificationUrl)
@@ -76,6 +98,7 @@ const sendPasswordResetOtp = async (email, name, otp) => {
 };
 exports.sendPasswordResetOtp = sendPasswordResetOtp;
 const sendPasswordResetSuccess = async (email, name) => {
+    requireEmailConfig();
     await transporter.sendMail({
         from: `"தூறல் பதிப்பகம்" <${process.env.EMAIL_USER}>`,
         to: email,
@@ -110,10 +133,10 @@ const sendLegacyOrderConfirmationEmails = async (order) => {
     ]);
 };
 const sendOrderConfirmationEmails = async (order) => {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.warn("Order emails skipped: email configuration is incomplete");
-        return;
-    }
+    requireEmailConfig();
+    const adminRecipients = getAdminRecipients();
+    if (!adminRecipients.length)
+        throw new Error("ADMIN_EMAIL or EMAIL_USER is required for order notifications");
     const [customerTemplate, adminTemplate] = await Promise.all([
         readEmailTemplate("orderConfirmation.html"),
         readEmailTemplate("newOrderAdmin.html"),
@@ -126,10 +149,15 @@ const sendOrderConfirmationEmails = async (order) => {
         shippingFee: money(order.shippingFee), totalAmount: money(order.totalAmount),
         shippingAddress: addressHtml(order),
     };
-    await Promise.all([
+    const results = await Promise.allSettled([
         transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: order.customerEmail, subject: `Order confirmed - #${values.orderNumber}`, html: renderTemplate(customerTemplate, values) }),
-        transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: getAdminRecipients(), replyTo: order.customerEmail, subject: `New order received - #${values.orderNumber}`, html: renderTemplate(adminTemplate, values) }),
+        transporter.sendMail({ from: `"Thooral Pathippagam" <${process.env.EMAIL_USER}>`, to: adminRecipients, replyTo: order.customerEmail, subject: `New order received - #${values.orderNumber}`, html: renderTemplate(adminTemplate, values) }),
     ]);
+    const failures = results
+        .map((result, index) => result.status === "rejected" ? `${index === 0 ? "customer" : "admin"}: ${String(result.reason)}` : null)
+        .filter(Boolean);
+    if (failures.length)
+        throw new Error(`Order email delivery failed (${failures.join("; ")})`);
 };
 exports.sendOrderConfirmationEmails = sendOrderConfirmationEmails;
 const sendAdminRegistrationEmail = async (user) => {
