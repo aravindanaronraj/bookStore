@@ -67,10 +67,10 @@ const productFormData = (data: ProductInput, images: File[]) => {
   return form;
 };
 export const createAdminProduct = async (data: ProductInput, images: File[]) => {
-  await api.post("/admin/products", productFormData(data, images), { headers: { "Content-Type": "multipart/form-data" } });
+  await api.post("/admin/products", productFormData(data, images));
 };
 export const updateAdminProduct = async (id: string, data: ProductInput, images: File[]) => {
-  await api.put(`/admin/products/${id}`, productFormData(data, images), { headers: { "Content-Type": "multipart/form-data" } });
+  await api.put(`/admin/products/${id}`, productFormData(data, images));
 };
 export const removeAdminProduct = async (id: string, action: "hide" | "delete") => { await api.delete(`/admin/products/${id}`, { data: { action } }); };
 
@@ -89,7 +89,7 @@ export const updateSiteContent = async (content: SiteContent, heroImage?: File) 
   const form = new FormData();
   form.append("hero", JSON.stringify(content.hero)); form.append("about", JSON.stringify(content.about)); form.append("footer", JSON.stringify(content.footer)); form.append("announcement", JSON.stringify(content.announcement));
   if (heroImage) form.append("heroImage", heroImage);
-  return (await api.put<{ content: SiteContent }>("/admin/content", form, { headers: { "Content-Type": "multipart/form-data" } })).data.content;
+  return (await api.put<{ content: SiteContent }>("/admin/content", form)).data.content;
 };
 export const getAdminContacts = async () => (await api.get<{ messages: ContactMessage[] }>("/admin/contacts")).data.messages;
 export const updateContactStatus = async (id: string, status: ContactMessage["status"]) => (await api.patch<{ message: ContactMessage }>(`/admin/contacts/${id}/status`, { status })).data.message;

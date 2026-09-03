@@ -14,7 +14,7 @@ const uploadToCloudinary = (buffer, folder) => {
                 reject(error);
             }
             else if (result) {
-                resolve(result.secure_url);
+                resolve({ url: result.secure_url, publicId: result.public_id });
             }
             else {
                 reject(new Error("Cloudinary upload failed"));
