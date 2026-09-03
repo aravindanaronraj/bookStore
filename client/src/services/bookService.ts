@@ -69,13 +69,13 @@ export const getFeaturedBooks =
   async (): Promise<Book[]> => {
     const response =
       await api.get<BooksResponse>(
-        "/books?featured=true&limit=8"
+        "/books?featured=true&limit=4"
       );
 
     return response.data.books;
   };
 
-export const getNewLaunchBooks = async (): Promise<Book[]> => (await api.get<BooksResponse>("/books?newLaunch=true&limit=8")).data.books;
+export const getNewLaunchBooks = async (): Promise<Book[]> => (await api.get<BooksResponse>("/books?newLaunch=true&limit=4")).data.books;
 
 
 
