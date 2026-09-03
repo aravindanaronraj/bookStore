@@ -1,14 +1,9 @@
 import cloudinary from "../config/cloudinary";
 
-export interface CloudinaryImage {
-  url: string;
-  publicId: string;
-}
-
 const uploadToCloudinary = (
   buffer: Buffer,
   folder: string
-): Promise<CloudinaryImage> => {
+): Promise<string> => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
@@ -19,7 +14,7 @@ const uploadToCloudinary = (
         if (error) {
           reject(error);
         } else if (result) {
-          resolve({ url: result.secure_url, publicId: result.public_id });
+          resolve(result.secure_url);
         } else {
           reject(new Error("Cloudinary upload failed"));
         }
