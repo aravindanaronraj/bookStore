@@ -19,8 +19,8 @@ const app = express();
 // Middlewares
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://book-store-ukx2llw1u-aravindan1.vercel.app",
+ 
+  import.meta.env.VITE_CLIENT_URL || "http://localhost:5173"
 ];
 
 app.use(
