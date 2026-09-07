@@ -7,8 +7,7 @@
     "dev": "nodemon --config nodemon.json",
     "dev:local": "nodemon --config nodemon.json",
     "build": "tsc && node dist/scripts/copyEmailTemplates.js",
-    "start": "node dist/server.js",
-    "seed:books": "tsx src/scripts/seedTamilBooks.ts"
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
